@@ -1,6 +1,6 @@
-# Konpaniondx
+# KonpanionDx
 
-### Konpaniondx is a forked HKMPpouch mod that adds a little knight to keep you company (works with CustomKnight)
+### KonpanionDx is a forked HKMPpouch mod that adds a little knight to keep you company (works with CustomKnight)
 
 # 0.2.1.0
 
