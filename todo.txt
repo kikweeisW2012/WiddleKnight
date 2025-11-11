@@ -1,0 +1,7 @@
+1. resting animation when on bench always
+2. find dancing animation????
+3. ability to add custom models instead of pulling from CustomKnight
+4. add abilities like widdle pets for sm64coopdx maybe?
+5. dash animation when u dash
+5.1. ^monarch wings animation
+5.2. ^^mantis claw animation
