@@ -36,7 +36,7 @@ namespace Konpanion
 
         public GameObject followTarget;
         public float followDistance = 2f;
-        public float teleportDistance = 15f;
+        public float teleportDistance = 10f;
 
         public AudioClip teleport,walk,yay;
         public Dictionary<State,string> Animations = new Dictionary<State,string>();
