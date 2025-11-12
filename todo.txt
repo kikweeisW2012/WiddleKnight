@@ -3,6 +3,5 @@
 3. ability to add custom models instead of pulling from CustomKnight
 4. add abilities like widdle pets for sm64coopdx maybe?
 5. dash animation when u dash
-5.1. ^monarch wings animation
-5.2. ^^mantis claw animation
+5.1. ^monarch wings
 ✅6. prob rename to widdle knight or smth like that
