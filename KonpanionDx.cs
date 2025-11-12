@@ -21,7 +21,7 @@ namespace KonpanionDx
         }
         public override string GetVersion()
         {
-            return "0.2.1.0";
+            return "0.2.3.6";
         }
 
         public GameObject createKnightCompanion(GameObject ft = null){
@@ -37,8 +37,8 @@ namespace KonpanionDx
             knight.GetAddComponent<MeshRenderer>().enabled = true;
             knight.GetAddComponent<Rigidbody2D>().gravityScale = 1f;
 
-            //add control and adjust parameters
             var kc = knight.GetAddComponent<CompanionControl>();
+            // needs to be 10 or its glitchy
             kc.moveSpeed = 10f;
             kc.followDistance = 2f;
             kc.IdleShuffleDistance = 0.01f;
@@ -47,16 +47,14 @@ namespace KonpanionDx
                 kc.followTarget = ft;
             }
 
-            //fix up collider size
+
             var collider = knight.GetAddComponent<BoxCollider2D>();
             collider.size = new Vector2(1f,2.0f);
             collider.offset = new Vector2(0f,-0.4f);
             collider.enabled = true;
 
-            // add animations
             kc.Animations.Add(State.Idle,"Idle");
-            kc.Animations.Add(State.IdleFidget1,"Acid Death");
-            kc.Animations.Add(State.IdleFidget2,"Prostrate");
+            kc.Animations.Add(State.laying,"Prostrate");
             kc.Animations.Add(State.Walk,"Run");
             kc.Animations.Add(State.Turn,"Map Walk");
             kc.Animations.Add(State.Teleport,"Fall");

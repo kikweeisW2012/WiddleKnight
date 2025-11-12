@@ -9,8 +9,7 @@ namespace KonpanionDx
 {
     public enum State {
         Idle = 0,
-        IdleFidget1,
-        IdleFidget2,
+        laying,
         Turn,
         Walk,
         Jump,
@@ -31,7 +30,8 @@ namespace KonpanionDx
         public AudioSource audioSource;
 
         public float scale = 0.6f;
-        public float moveSpeed = 15f;
+        // needs to be 10 or its glitchy
+        public float moveSpeed = 10f;
         public float IdleShuffleDistance = 0.1f;
 
         public GameObject followTarget;
@@ -47,6 +47,8 @@ namespace KonpanionDx
 
         private bool changeDirection = false;
         internal bool moveToNext = true;
+        private float idleTimer = 0f;
+        private const float LAYING_IDLE_TIME = 10f;
         
         public GameObject getFollowTarget(){
             if(followTarget == null){
@@ -110,7 +112,6 @@ namespace KonpanionDx
         }
 
         private void fixRotation(){
-            //fix rotation
             gameObject.transform.rotation = Quaternion.identity;
         }
 
@@ -120,7 +121,7 @@ namespace KonpanionDx
            if(teleport != null && !audioSource.isPlaying && Random.Range(0.0f, 1.0f) < turnClipChance){
                audioSource.PlayOneShot(teleport);
            }
-           yield return new WaitForSeconds(0.5f); // atleast stay here for this duration
+           yield return new WaitForSeconds(0.5f);
            var ls = gameObject.transform.localScale;
            ls.x = (lookDirection == Direction.Left? 1f : -1f)*Mathf.Abs(ls.x);
            gameObject.transform.localScale = ls;
@@ -148,6 +149,12 @@ namespace KonpanionDx
                 state = State.Idle;
             }
         }
+        private bool isHeroSittingOnBench(){
+            var hero = HeroController.instance;
+            if(hero == null) return false;
+            return hero.cState.onGround && !hero.cState.dashing && !hero.cState.attacking && Mathf.Abs(hero.GetComponent<Rigidbody2D>().velocity.x) < 0.1f;
+        }
+
         private IEnumerator Idle(){
             fixRotation();
             playAnimForState(true);
@@ -155,33 +162,35 @@ namespace KonpanionDx
                 audioSource.PlayOneShot(yay);
             }
             rb.velocity = new Vector2(0.0f, 0.0f);
-
-            //var force = new Vector2(Random.Range(-1.0f, 1.0f),Random.Range(-1.0f, 1.0f));
-            //yield return rb.moveTowards(-force,IdleShuffleDistance,0.2f);
             
             var lastState = state;
             decideNextState();
-            if(state == State.Idle && (lastState == State.IdleFidget1 || lastState == State.IdleFidget2)){
+            
+            float waitTime = 0.1f;
+            
+            if(state == State.Idle && lastState == State.laying){
                 state = lastState;
-                yield return new WaitForSeconds(0.1f); // atleast stay idle for this duration
+                waitTime = 0.1f;
             } else if(lastState == State.Idle){
-                var roll = Random.Range(0.0f, 1.0f);
-                if(roll < 0.001f){
-                    state = State.IdleFidget1;
-                }else if(roll < 0.011f){
-                    state = State.IdleFidget2;
+                idleTimer += waitTime;
+
+                if(idleTimer >= LAYING_IDLE_TIME){
+                    state = State.laying;
+                    idleTimer = 0f;
                 }
-                yield return new WaitForSeconds(0.1f); // atleast stay idle for this duration
+                waitTime = 0.1f;
             } else {
                 if(!(lastState == state && state == State.Walk)){
-                    yield return new WaitForSeconds(1f); // atleast stay idle for this duration
+                    waitTime = 1f;
                 }
+                idleTimer = 0f;
             }
+            
+            yield return new WaitForSeconds(waitTime);
             moveToNext = true;
 
         }
         private IEnumerator Teleport(){
-            //play Teleport animation
             fixRotation();
             if(teleport != null && !audioSource.isPlaying && Random.Range(0.0f, 1.0f) < teleportClipChance){
                 audioSource.PlayOneShot(teleport);
@@ -193,20 +202,18 @@ namespace KonpanionDx
             } else {
                 gameObject.transform.position = getFollowTarget().transform.position + new Vector3(-0.5f + deltaToPlayer,0f,0f);
             }
-            yield return new WaitForSeconds(0.1f); // atleast stay here for this duration
+            yield return new WaitForSeconds(0.1f);
 
             state = State.Idle;
             moveToNext = true;
         }
 
         private IEnumerator Follow(){
-            //play follow animation
             playAnimForState();
             if(walk != null && !audioSource.isPlaying && Random.Range(0.0f, 1.0f) < followClipChance){
                 audioSource.PlayOneShot(walk);
             }
 
-            //get displacement to player
             Vector2 displacement;
             displacement = getFollowTarget().transform.position - transform.position;
             displacement += new Vector2(Random.Range(-0.01f, 0.01f),Random.Range(-0.01f, 0.01f));
@@ -216,10 +223,9 @@ namespace KonpanionDx
             var followDistanceR = followDistance * (1f+Random.Range(-0.25f, 0.50f));
             var distance = Mathf.Min(teleportDistance,displacement.magnitude-followDistanceR);
             var moveSpeedR = moveSpeed * (1f+Random.Range(-0.25f, 0.50f));
-            yield return rb.moveTowards(displacement,distance*0.5f,distance*0.5f/moveSpeedR);
-            playAnimForState();
-            yield return rb.moveTowards(displacement,distance*0.5f,distance*0.5f/moveSpeedR);
-
+            
+            // Use smooth velocity-based movement instead of discrete steps
+            yield return rb.moveTowards(displacement, distance, distance/moveSpeedR);
 
             state = State.Idle;
             moveToNext = true;
@@ -229,13 +235,10 @@ namespace KonpanionDx
         public Coroutine networkCoro;
         private IEnumerator ApplyNetworkState(){
             yield return null;
-            // play animation
             playAnimForState();
-            // update direction
             var ls = gameObject.transform.localScale;
             ls.x = (lookDirection == Direction.Left? 1f : -1f)*Mathf.Abs(ls.x);
             gameObject.transform.localScale = ls;
-            //interpolate movement
             var value = 0.1f;
             if(state == State.Teleport){
                 transform.position = networkMovementTarget;
@@ -266,7 +269,7 @@ namespace KonpanionDx
                     PouchIntegration.SendUpdate(this);
                 }
 
-                if (state == State.Idle || state == State.IdleFidget1 || state == State.IdleFidget2){
+                if (state == State.Idle || state == State.laying){
                     StartCoroutine(Idle());
                 } else if(state == State.Walk){
                     StartCoroutine(Follow());
