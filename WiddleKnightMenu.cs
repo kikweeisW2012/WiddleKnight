@@ -35,6 +35,7 @@ namespace WiddleKnight
                     (index) => 
                     {
                         WiddleKnight.Instance.GlobalSettings.CustomSubOption = index;
+                        WiddleKnight.Instance.OnOptionChanged();
                     },
                     () => WiddleKnight.Instance.GlobalSettings.CustomSubOption,
                     Id: "CustomSubOption"

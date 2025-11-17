@@ -4,6 +4,7 @@ using UnityEngine;
 using static Satchel.EnemyUtils;
 using static Satchel.GameObjectUtils;
 using Satchel.BetterMenus;
+using System.IO;
 
 namespace WiddleKnight
 {
@@ -24,7 +25,7 @@ namespace WiddleKnight
         }
         public override string GetVersion()
         {
-            return "pre-release 0.2.3.21";
+            return "pre-release 0.2.3.29";
         }
 
         public GameObject createKnightcompanion(GameObject ft = null){
@@ -63,8 +64,94 @@ namespace WiddleKnight
             kc.Animations.Add(State.Teleport,"Fall");
             kc.Animations.Add(State.Jump,"Airborne");
 
+            if(GlobalSettings.SelectedSkinOption == 2)
+            {
+                ApplyCustomSkin(knight);
+            }
+
             knight.SetActive(true);
             return knight;
+        }
+
+        private void ApplyCustomSkin(GameObject knight)
+        {
+            try
+            {
+                string modPath = Path.GetDirectoryName(typeof(WiddleKnight).Assembly.Location);
+                string skinsPath = Path.Combine(modPath, "Skins");
+                
+                if (!Directory.Exists(skinsPath))
+                {
+                    LogError("Skins folder not found");
+                    return;
+                }
+
+                string[] skinFolders = Directory.GetDirectories(skinsPath);
+                
+                if (skinFolders.Length == 0 || GlobalSettings.CustomSubOption >= skinFolders.Length)
+                {
+                    LogError("No valid skin folder selected");
+                    return;
+                }
+
+                string selectedSkinFolder = skinFolders[GlobalSettings.CustomSubOption];
+                string knightPngPath = Path.Combine(selectedSkinFolder, "Knight.png");
+
+                if (!File.Exists(knightPngPath))
+                {
+                    LogError($"Knight.png not found in {selectedSkinFolder}");
+                    return;
+                }
+
+                byte[] textureBytes = File.ReadAllBytes(knightPngPath);
+                Texture2D customTexture = new Texture2D(2, 2);
+                customTexture.LoadImage(textureBytes);
+
+                var spriteAnimator = knight.GetComponent<tk2dSpriteAnimator>();
+                if (spriteAnimator != null && spriteAnimator.Library != null)
+                {
+                    // Clone the animation library to avoid modifying the shared one
+                    var newLibrary = Object.Instantiate(spriteAnimator.Library);
+                    spriteAnimator.Library = newLibrary;
+
+                    foreach (var clip in newLibrary.clips)
+                    {
+                        if (clip != null && clip.frames != null)
+                        {
+                            foreach (var frame in clip.frames)
+                            {
+                                if (frame != null && frame.spriteCollection != null)
+                                {
+                                    // Clone the sprite collection
+                                    var newCollection = Object.Instantiate(frame.spriteCollection);
+                                    frame.spriteCollection = newCollection;
+                                    
+                                    var spriteDefinitions = newCollection.spriteDefinitions;
+                                    if (spriteDefinitions != null)
+                                    {
+                                        for (int i = 0; i < spriteDefinitions.Length; i++)
+                                        {
+                                            if (spriteDefinitions[i] != null && spriteDefinitions[i].material != null)
+                                            {
+                                                // Create a new material instance
+                                                Material newMaterial = new Material(spriteDefinitions[i].material);
+                                                newMaterial.mainTexture = customTexture;
+                                                spriteDefinitions[i].material = newMaterial;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Log($"Applied custom skin from {selectedSkinFolder}");
+            }
+            catch (System.Exception e)
+            {
+                LogError($"Error applying custom skin: {e.Message}");
+            }
         }
 
         public override void Initialize()

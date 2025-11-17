@@ -2,6 +2,9 @@
  
 ### WiddleKnight is a forked HKMPpouch mod that adds a little knight to keep you company (works with CustomKnight).
 
+# pre-release 0.2.3.29
+**Made the option "custom" change only the WK skin (game stops running while changing the "skin" sub option (sometimes crashes))**
+____
 # pre-release 0.2.3.21
 **Added mod menu interface.**
 **Added the options to turn off the mod, use the Current Knights skin (clone the current skin of the knight), add a custom WiddleKnight skin (Just interface)**

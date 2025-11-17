@@ -224,7 +224,6 @@ namespace WiddleKnight
             var distance = Mathf.Min(teleportDistance,displacement.magnitude-followDistanceR);
             var moveSpeedR = moveSpeed * (1f+Random.Range(-0.25f, 0.50f));
             
-            // Use smooth velocity-based movement instead of discrete steps
             yield return rb.moveTowards(displacement, distance, distance/moveSpeedR);
 
             state = State.Idle;
