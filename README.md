@@ -2,6 +2,9 @@
  
 ### WiddleKnight is a forked HKMPpouch mod that adds a little knight to keep you company (works with CustomKnight).
 
+# pre-release 0.2.3.34
+**Fixed WK loading**
+____
 # pre-release 0.2.3.31
 **fixed crashes**
 ____

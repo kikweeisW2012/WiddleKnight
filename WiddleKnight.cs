@@ -27,7 +27,7 @@ namespace WiddleKnight
         }
         public override string GetVersion()
         {
-            return "pre-release 0.2.3.31";
+            return "pre-release 0.2.3.34";
         }
 
         public GameObject createKnightcompanion(GameObject ft = null){
@@ -70,6 +70,8 @@ namespace WiddleKnight
             {
                 ApplyCustomSkin(knight);
             }
+
+            UnityEngine.Object.DontDestroyOnLoad(knight);
 
             knight.SetActive(true);
             return knight;
@@ -129,6 +131,8 @@ namespace WiddleKnight
                     Log($"Creating cached library for {cacheKey}");
 
                     var newLibrary = Object.Instantiate(spriteAnimator.Library);
+                    
+                    UnityEngine.Object.DontDestroyOnLoad(newLibrary);
 
                     var materialMap = new Dictionary<Material, Material>();
 
@@ -141,6 +145,9 @@ namespace WiddleKnight
                                 if (frame != null && frame.spriteCollection != null)
                                 {
                                     var newCollection = Object.Instantiate(frame.spriteCollection);
+                                    
+                                    UnityEngine.Object.DontDestroyOnLoad(newCollection);
+                                    
                                     frame.spriteCollection = newCollection;
                                     
                                     var spriteDefinitions = newCollection.spriteDefinitions;
@@ -156,6 +163,10 @@ namespace WiddleKnight
                                                 {
                                                     Material newMaterial = new Material(originalMaterial);
                                                     newMaterial.mainTexture = customTexture;
+                                                    
+                                                    UnityEngine.Object.DontDestroyOnLoad(newMaterial);
+                                                    UnityEngine.Object.DontDestroyOnLoad(customTexture);
+                                                    
                                                     materialMap[originalMaterial] = newMaterial;
                                                 }
                                                 
@@ -204,6 +215,8 @@ namespace WiddleKnight
             if(GlobalSettings.SelectedSkinOption == 0) {
                 return;
             }
+            
+            knights.RemoveAll(k => k == null);
             
             if(knights.Count < 1) {
                 knights.Add(createKnightcompanion());
