@@ -30,8 +30,8 @@ namespace WiddleKnight
         public AudioSource audioSource;
 
         public float scale = 0.6f;
-        // needs to be 10 or its glitchy
-        public float moveSpeed = 11f;
+        // needs to be 10.5 or its glitchy
+        public float moveSpeed = 10.5f;
         public float IdleShuffleDistance = 0.1f;
 
         public GameObject followTarget;

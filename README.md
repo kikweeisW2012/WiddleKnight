@@ -9,6 +9,9 @@
 **4. Add any "Knight.png" file from any skin mod inside the skin folder you created.**
 **Now your skin should show up under option "Custom"**
 
+# pre-release 0.2.3.41
+**optimized**
+____
 # pre-release 0.2.3.40
 **fixed saving**
 **fixed menu**

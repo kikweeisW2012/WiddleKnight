@@ -3,315 +3,242 @@ using System.Collections.Generic;
 using UnityEngine;
 using static Satchel.EnemyUtils;
 using static Satchel.GameObjectUtils;
-using Satchel.BetterMenus;
 using System.IO;
 
 namespace WiddleKnight
 {
     public class WiddleKnight : Mod, ICustomMenuMod
     {
-
         internal static WiddleKnight Instance;
 
         internal static List<GameObject> knights = new List<GameObject>();
+        
         internal static Dictionary<ushort,GameObject> remoteKnights = new Dictionary<ushort,GameObject>();
 
-        private static Dictionary<string, tk2dSpriteAnimation> cachedLibraries = new Dictionary<string, tk2dSpriteAnimation>();
+        private static readonly Dictionary<string, tk2dSpriteAnimation> cachedLibraries = new Dictionary<string, tk2dSpriteAnimation>();
 
         public GlobalSettings GlobalSettings { get; set; } = new GlobalSettings();
+
+        public void SaveSettings() => Log("Saving settings");
+
+        public static bool HasPouch() => ModHooks.GetMod("HkmpPouch") is Mod;
         
-        public void SaveSettings()
-        {
-            Log("Saving global settings");
-        }
+        public override string GetVersion() => "pre-release 0.2.3.41";
 
-        public static bool HasPouch()
+        // Creating WiddleKnight
+        public GameObject createKnightcompanion(GameObject followTarget = null)
         {
-            var hasPouch = ModHooks.GetMod("HkmpPouch") is Mod;
-            return hasPouch;
-        }
-        public override string GetVersion()
-        {
-            return "pre-release 0.2.3.40";
-        }
-
-        public GameObject createKnightcompanion(GameObject ft = null){
-            HeroController.instance.gameObject.SetActive(false);
-            var knight = HeroController.instance.gameObject.createCompanionFromPrefab();
-            HeroController.instance.gameObject.SetActive(true);
+            // Clone the player
+            var player = HeroController.instance.gameObject;
+            player.SetActive(false);
+            var knight = player.createCompanionFromPrefab();
+            player.SetActive(true);
+            
+            // Remove components
             knight.RemoveComponent<HeroController>();
             knight.RemoveComponent<HeroAnimationController>();
             knight.RemoveComponent<HeroAudioController>();
             knight.RemoveComponent<ConveyorMovementHero>();
 
+            // properties
             knight.name = "WiddleKnight";
             knight.GetAddComponent<MeshRenderer>().enabled = true;
             knight.GetAddComponent<Rigidbody2D>().gravityScale = 1f;
 
-            var kc = knight.GetAddComponent<WiddleKnightControl>();
-            // needs to be max 10.5 or its glitchy
-            kc.moveSpeed = 10.5f;
-            kc.followDistance = 2f;
-            kc.IdleShuffleDistance = 0.01f;
+            // behavior
+            var control = knight.GetAddComponent<WiddleKnightControl>();
+            control.moveSpeed = 10.5f; // Max speed
+            control.followDistance = 2f;
+            control.IdleShuffleDistance = 0.01f;
+            control.followTarget = followTarget;
 
-            if(ft != null){
-                kc.followTarget = ft;
-            }
-
-
+            // collision
             var collider = knight.GetAddComponent<BoxCollider2D>();
-            collider.size = new Vector2(1f,2.0f);
-            collider.offset = new Vector2(0f,-0.4f);
+            collider.size = new Vector2(1f, 2.0f);
+            collider.offset = new Vector2(0f, -0.4f);
             collider.enabled = true;
 
-            kc.Animations.Add(State.Idle,"Idle");
-            kc.Animations.Add(State.laying,"Prostrate");
-            kc.Animations.Add(State.Walk,"Run");
-            kc.Animations.Add(State.Turn,"Map Walk");
-            kc.Animations.Add(State.Teleport,"Fall");
-            kc.Animations.Add(State.Jump,"Airborne");
+            // animations
+            control.Animations.Add(State.Idle, "Idle");
+            control.Animations.Add(State.laying, "Prostrate");
+            control.Animations.Add(State.Walk, "Run");
+            control.Animations.Add(State.Turn, "Map Walk");
+            control.Animations.Add(State.Teleport, "Fall");
+            control.Animations.Add(State.Jump, "Airborne");
 
-            if(GlobalSettings.SelectedSkinOption == 2)
-            {
+            // Appling custom skins
+            if (GlobalSettings.SelectedSkinOption == 2)
                 ApplyCustomSkin(knight);
-            }
 
-            UnityEngine.Object.DontDestroyOnLoad(knight);
+            // load
+            Object.DontDestroyOnLoad(knight);
 
             knight.SetActive(true);
             return knight;
         }
 
+        // Applies Custom Skin
         private void ApplyCustomSkin(GameObject knight)
         {
             try
             {
-                if (knight == null)
-                {
-                    LogError("Knight is null, cannot apply skin");
-                    return;
-                }
+                if (knight == null) return;
 
+                // Find skins folder
                 string modPath = Path.GetDirectoryName(typeof(WiddleKnight).Assembly.Location);
                 string skinsPath = Path.Combine(modPath, "Skins");
                 
-                if (!Directory.Exists(skinsPath))
-                {
-                    LogError("Skins folder not found");
-                    return;
-                }
+                if (!Directory.Exists(skinsPath)) return;
 
                 string[] skinFolders = Directory.GetDirectories(skinsPath);
-                
-                if (skinFolders.Length == 0 || GlobalSettings.CustomSubOption >= skinFolders.Length)
-                {
-                    LogError("No valid skin folder selected");
-                    return;
-                }
+                if (skinFolders.Length == 0 || GlobalSettings.CustomSubOption >= skinFolders.Length) return;
 
+                // Load texture
                 string selectedSkinFolder = skinFolders[GlobalSettings.CustomSubOption];
                 string knightPngPath = Path.Combine(selectedSkinFolder, "Knight.png");
-
-                if (!File.Exists(knightPngPath))
-                {
-                    LogError($"Knight.png not found in {selectedSkinFolder}");
-                    return;
-                }
+                if (!File.Exists(knightPngPath)) return;
 
                 byte[] textureBytes = File.ReadAllBytes(knightPngPath);
                 Texture2D customTexture = new Texture2D(2, 2);
                 customTexture.LoadImage(textureBytes);
 
                 var spriteAnimator = knight.GetComponent<tk2dSpriteAnimator>();
-                if (spriteAnimator == null || spriteAnimator.Library == null)
-                {
-                    LogError("Sprite animator or library is null");
-                    return;
-                }
+                if (spriteAnimator?.Library == null) return;
 
-                string cacheKey = $"{selectedSkinFolder}";
-                
-                if (!cachedLibraries.ContainsKey(cacheKey))
+                // Cash data
+                if (!cachedLibraries.ContainsKey(selectedSkinFolder))
                 {
-                    Log($"Creating cached library for {cacheKey}");
+                    Log($"Caching skin: {selectedSkinFolder}");
 
+                    // Clone library to avoid modifying player's sprites
                     var newLibrary = Object.Instantiate(spriteAnimator.Library);
-                    
-                    UnityEngine.Object.DontDestroyOnLoad(newLibrary);
+                    Object.DontDestroyOnLoad(newLibrary);
 
                     var materialMap = new Dictionary<Material, Material>();
 
+                    // Clone skin
                     foreach (var clip in newLibrary.clips)
                     {
-                        if (clip != null && clip.frames != null)
-                        {
-                            foreach (var frame in clip.frames)
-                            {
-                                if (frame != null && frame.spriteCollection != null)
-                                {
-                                    var newCollection = Object.Instantiate(frame.spriteCollection);
-                                    
-                                    UnityEngine.Object.DontDestroyOnLoad(newCollection);
-                                    
-                                    frame.spriteCollection = newCollection;
-                                    
-                                    var spriteDefinitions = newCollection.spriteDefinitions;
-                                    if (spriteDefinitions != null)
-                                    {
-                                        for (int i = 0; i < spriteDefinitions.Length; i++)
-                                        {
-                                            if (spriteDefinitions[i] != null && spriteDefinitions[i].material != null)
-                                            {
-                                                var originalMaterial = spriteDefinitions[i].material;
+                        if (clip?.frames == null) continue;
 
-                                                if (!materialMap.ContainsKey(originalMaterial))
-                                                {
-                                                    Material newMaterial = new Material(originalMaterial);
-                                                    newMaterial.mainTexture = customTexture;
-                                                    
-                                                    UnityEngine.Object.DontDestroyOnLoad(newMaterial);
-                                                    UnityEngine.Object.DontDestroyOnLoad(customTexture);
-                                                    
-                                                    materialMap[originalMaterial] = newMaterial;
-                                                }
-                                                
-                                                spriteDefinitions[i].material = materialMap[originalMaterial];
-                                            }
-                                        }
-                                    }
+                        foreach (var frame in clip.frames)
+                        {
+                            if (frame?.spriteCollection == null) continue;
+
+                            var newCollection = Object.Instantiate(frame.spriteCollection);
+                            Object.DontDestroyOnLoad(newCollection);
+                            frame.spriteCollection = newCollection;
+                            
+                            var sprites = newCollection.spriteDefinitions;
+                            if (sprites == null) continue;
+
+                            for (int i = 0; i < sprites.Length; i++)
+                            {
+                                if (sprites[i]?.material == null) continue;
+
+                                var originalMat = sprites[i].material;
+
+                                if (!materialMap.ContainsKey(originalMat))
+                                {
+                                    var newMat = new Material(originalMat);
+                                    newMat.mainTexture = customTexture;
+                                    Object.DontDestroyOnLoad(newMat);
+                                    Object.DontDestroyOnLoad(customTexture);
+                                    materialMap[originalMat] = newMat;
                                 }
+                                
+                                sprites[i].material = materialMap[originalMat];
                             }
                         }
                     }
                     
-                    cachedLibraries[cacheKey] = newLibrary;
+                    cachedLibraries[selectedSkinFolder] = newLibrary;
                 }
                 
-                spriteAnimator.Library = cachedLibraries[cacheKey];
-
-                Log($"Applied custom skin from {selectedSkinFolder}");
+                // Apply library
+                spriteAnimator.Library = cachedLibraries[selectedSkinFolder];
+                Log($"Applied skin: {Path.GetFileName(selectedSkinFolder)}");
             }
             catch (System.Exception e)
             {
-                LogError($"Error applying custom skin: {e.Message}");
+                LogError($"Skin error: {e.Message}");
             }
         }
 
+        // Initialize mod
         public override void Initialize()
         {
             Instance = this;
-            Log($"Initializing WiddleKnight - SelectedSkinOption: {GlobalSettings.SelectedSkinOption}, CustomSubOption: {GlobalSettings.CustomSubOption}");
+            Log($"Init - Option: {GlobalSettings.SelectedSkinOption}, Skin: {GlobalSettings.CustomSubOption}");
+            
             ModHooks.HeroUpdateHook += update;
-
             ModHooks.AfterSavegameLoadHook += OnSaveGameLoad;
             
-            if (WiddleKnight.HasPouch())
-            {
+            if (HasPouch())
                 PouchIntegration.Initialize();
-            }
         }
         
+        // Clear knight
         private void OnSaveGameLoad(SaveGameData data)
         {
-            Log($"Save game loaded - Reloading settings: SelectedSkinOption: {GlobalSettings.SelectedSkinOption}, CustomSubOption: {GlobalSettings.CustomSubOption}");
-
+            Log($"Save loaded - Option: {GlobalSettings.SelectedSkinOption}, Skin: {GlobalSettings.CustomSubOption}");
+            
             knights.RemoveAll(k => k == null);
-            if (knights.Count > 0)
-            {
-                Log("Clearing existing knights after save load");
-                foreach (var knight in knights)
-                {
-                    if (knight != null)
-                    {
-                        UnityEngine.Object.Destroy(knight);
-                    }
-                }
-                knights.Clear();
-            }
+            foreach (var knight in knights)
+                if (knight != null) Object.Destroy(knight);
+            knights.Clear();
         }
 
-
-        public GameObject GetNetworkWiddleKnight(ushort id){
-            if(remoteKnights.TryGetValue(id,out var knight)){
+        // network
+        public GameObject GetNetworkWiddleKnight(ushort id)
+        {
+            if (remoteKnights.TryGetValue(id, out var knight))
                 return knight;
-            }
+            
             remoteKnights[id] = createKnightcompanion();
             return remoteKnights[id];
         }
+        
+        // creates knight if needed
         public void update()
         {
-            if(GlobalSettings.SelectedSkinOption == 0) {
+            if (GlobalSettings.SelectedSkinOption == 0 || HeroController.instance == null)
                 return;
-            }
 
-            if(HeroController.instance == null) {
-                return;
-            }
-            
             knights.RemoveAll(k => k == null);
-            
-            if(knights.Count < 1) {
-                Log($"Creating knight - SelectedSkinOption: {GlobalSettings.SelectedSkinOption}, CustomSubOption: {GlobalSettings.CustomSubOption}");
+
+            if (knights.Count < 1)
+            {
                 try
                 {
                     knights.Add(createKnightcompanion());
-                    Log("Knight created successfully");
+                    Log("Knight created");
                 }
                 catch (System.Exception e)
                 {
-                    LogError($"Failed to create knight: {e.Message}\n{e.StackTrace}");
+                    LogError($"Create failed: {e.Message}");
                 }
             }
         }
 
+        // Destroy WiddleKnight on settings change
         public void OnOptionChanged()
         {
-            var knightsCopy = new List<GameObject>(knights);
+            foreach (var knight in knights)
+                if (knight != null) Object.Destroy(knight);
             knights.Clear();
 
-            foreach(var knight in knightsCopy)
-            {
-                if(knight != null)
-                {
-                    try
-                    {
-                        UnityEngine.Object.Destroy(knight);
-                    }
-                    catch (System.Exception e)
-                    {
-                        LogError($"Error destroying knight: {e.Message}");
-                    }
-                }
-            }
-
-            var remoteKnightsCopy = new Dictionary<ushort, GameObject>(remoteKnights);
+            foreach (var kvp in remoteKnights)
+                if (kvp.Value != null) Object.Destroy(kvp.Value);
             remoteKnights.Clear();
-
-            foreach(var kvp in remoteKnightsCopy)
-            {
-                if(kvp.Value != null)
-                {
-                    try
-                    {
-                        UnityEngine.Object.Destroy(kvp.Value);
-                    }
-                    catch (System.Exception e)
-                    {
-                        LogError($"Error destroying remote knight: {e.Message}");
-                    }
-                }
-            }
             
             cachedLibraries.Clear();
         }
 
-        public MenuScreen GetMenuScreen(MenuScreen modListMenu, ModToggleDelegates? toggleDelegates)
-        {
-            return WiddleKnightMenu.GetMenu(modListMenu);
-        }
+        // Menu
+        public MenuScreen GetMenuScreen(MenuScreen modListMenu, ModToggleDelegates? toggleDelegates) =>
+            WiddleKnightMenu.GetMenu(modListMenu);
 
         public bool ToggleButtonInsideMenu => false;
-
     }
-
 }
