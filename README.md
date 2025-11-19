@@ -13,6 +13,9 @@
 
 **Now your skin should show up under option "Custom"**
 
+# pre-release 0.2.3.42
+**fixed freeze when changing skin**
+____
 # pre-release 0.2.3.41
 **optimized**
 ____

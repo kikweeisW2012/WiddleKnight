@@ -1,4 +1,5 @@
 using Modding;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using static Satchel.EnemyUtils;
@@ -23,7 +24,7 @@ namespace WiddleKnight
 
         public static bool HasPouch() => ModHooks.GetMod("HkmpPouch") is Mod;
         
-        public override string GetVersion() => "pre-release 0.2.3.41";
+        public override string GetVersion() => "pre-release 0.2.3.42";
 
         // Creating WiddleKnight
         public GameObject createKnightcompanion(GameObject followTarget = null)
@@ -77,92 +78,110 @@ namespace WiddleKnight
             return knight;
         }
 
-        // Applies Custom Skin
+        // Applies custom skin
         private void ApplyCustomSkin(GameObject knight)
         {
             try
             {
                 if (knight == null) return;
 
-                // Find skins folder
                 string modPath = Path.GetDirectoryName(typeof(WiddleKnight).Assembly.Location);
                 string skinsPath = Path.Combine(modPath, "Skins");
-                
                 if (!Directory.Exists(skinsPath)) return;
 
                 string[] skinFolders = Directory.GetDirectories(skinsPath);
                 if (skinFolders.Length == 0 || GlobalSettings.CustomSubOption >= skinFolders.Length) return;
 
-                // Load texture
                 string selectedSkinFolder = skinFolders[GlobalSettings.CustomSubOption];
-                string knightPngPath = Path.Combine(selectedSkinFolder, "Knight.png");
-                if (!File.Exists(knightPngPath)) return;
-
-                byte[] textureBytes = File.ReadAllBytes(knightPngPath);
-                Texture2D customTexture = new Texture2D(2, 2);
-                customTexture.LoadImage(textureBytes);
-
-                var spriteAnimator = knight.GetComponent<tk2dSpriteAnimator>();
-                if (spriteAnimator?.Library == null) return;
-
-                // Cash data
-                if (!cachedLibraries.ContainsKey(selectedSkinFolder))
-                {
-                    Log($"Caching skin: {selectedSkinFolder}");
-
-                    // Clone library to avoid modifying player's sprites
-                    var newLibrary = Object.Instantiate(spriteAnimator.Library);
-                    Object.DontDestroyOnLoad(newLibrary);
-
-                    var materialMap = new Dictionary<Material, Material>();
-
-                    // Clone skin
-                    foreach (var clip in newLibrary.clips)
-                    {
-                        if (clip?.frames == null) continue;
-
-                        foreach (var frame in clip.frames)
-                        {
-                            if (frame?.spriteCollection == null) continue;
-
-                            var newCollection = Object.Instantiate(frame.spriteCollection);
-                            Object.DontDestroyOnLoad(newCollection);
-                            frame.spriteCollection = newCollection;
-                            
-                            var sprites = newCollection.spriteDefinitions;
-                            if (sprites == null) continue;
-
-                            for (int i = 0; i < sprites.Length; i++)
-                            {
-                                if (sprites[i]?.material == null) continue;
-
-                                var originalMat = sprites[i].material;
-
-                                if (!materialMap.ContainsKey(originalMat))
-                                {
-                                    var newMat = new Material(originalMat);
-                                    newMat.mainTexture = customTexture;
-                                    Object.DontDestroyOnLoad(newMat);
-                                    Object.DontDestroyOnLoad(customTexture);
-                                    materialMap[originalMat] = newMat;
-                                }
-                                
-                                sprites[i].material = materialMap[originalMat];
-                            }
-                        }
-                    }
-                    
-                    cachedLibraries[selectedSkinFolder] = newLibrary;
-                }
                 
-                // Apply library
-                spriteAnimator.Library = cachedLibraries[selectedSkinFolder];
-                Log($"Applied skin: {Path.GetFileName(selectedSkinFolder)}");
+                if (cachedLibraries.ContainsKey(selectedSkinFolder))
+                {
+                    var spriteAnimator = knight.GetComponent<tk2dSpriteAnimator>();
+                    if (spriteAnimator != null)
+                    {
+                        spriteAnimator.Library = cachedLibraries[selectedSkinFolder];
+                        Log($"Applied cached skin: {Path.GetFileName(selectedSkinFolder)}");
+                    }
+                }
+                else
+                {
+                    GameManager.instance.StartCoroutine(LoadSkinAsync(knight, selectedSkinFolder));
+                }
             }
             catch (System.Exception e)
             {
                 LogError($"Skin error: {e.Message}");
             }
+        }
+
+        // Loads skin asynchronously to prevent game freeze
+        private IEnumerator LoadSkinAsync(GameObject knight, string selectedSkinFolder)
+        {
+            Log($"Loading skin async: {Path.GetFileName(selectedSkinFolder)}");
+            
+            // Load texture
+            string knightPngPath = Path.Combine(selectedSkinFolder, "Knight.png");
+            if (!File.Exists(knightPngPath)) yield break;
+
+            byte[] textureBytes = File.ReadAllBytes(knightPngPath);
+            Texture2D customTexture = new Texture2D(2, 2);
+            customTexture.LoadImage(textureBytes);
+
+            var spriteAnimator = knight.GetComponent<tk2dSpriteAnimator>();
+            if (spriteAnimator?.Library == null) yield break;
+
+            // Clone library
+            var newLibrary = Object.Instantiate(spriteAnimator.Library);
+            Object.DontDestroyOnLoad(newLibrary);
+
+            var materialMap = new Dictionary<Material, Material>();
+            int processedClips = 0;
+
+            // Process clips with yields to prevent freezing
+            foreach (var clip in newLibrary.clips)
+            {
+                if (clip?.frames == null) continue;
+
+                foreach (var frame in clip.frames)
+                {
+                    if (frame?.spriteCollection == null) continue;
+
+                    var newCollection = Object.Instantiate(frame.spriteCollection);
+                    Object.DontDestroyOnLoad(newCollection);
+                    frame.spriteCollection = newCollection;
+                    
+                    var sprites = newCollection.spriteDefinitions;
+                    if (sprites == null) continue;
+
+                    for (int i = 0; i < sprites.Length; i++)
+                    {
+                        if (sprites[i]?.material == null) continue;
+
+                        var originalMat = sprites[i].material;
+
+                        if (!materialMap.ContainsKey(originalMat))
+                        {
+                            var newMat = new Material(originalMat);
+                            newMat.mainTexture = customTexture;
+                            Object.DontDestroyOnLoad(newMat);
+                            Object.DontDestroyOnLoad(customTexture);
+                            materialMap[originalMat] = newMat;
+                        }
+                        
+                        sprites[i].material = materialMap[originalMat];
+                    }
+                }
+
+                // Yield every few clips to prevent freeze
+                processedClips++;
+                if (processedClips % 5 == 0)
+                    yield return null;
+            }
+            
+            // Cache and apply
+            cachedLibraries[selectedSkinFolder] = newLibrary;
+            spriteAnimator.Library = newLibrary;
+            Log($"Skin loaded: {Path.GetFileName(selectedSkinFolder)}");
         }
 
         // Initialize mod
