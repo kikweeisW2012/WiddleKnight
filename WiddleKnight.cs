@@ -24,7 +24,7 @@ namespace WiddleKnight
 
         public static bool HasPouch() => ModHooks.GetMod("HkmpPouch") is Mod;
         
-        public override string GetVersion() => "pre-release 0.2.3.42";
+        public override string GetVersion() => "pre-release 1.0.1.0";
 
         // Creating WiddleKnight
         public GameObject createKnightcompanion(GameObject followTarget = null)

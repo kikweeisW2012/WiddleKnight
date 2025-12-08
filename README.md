@@ -13,6 +13,9 @@
 
 **Now your skin should show up under option "Custom"**
 
+## release 1.0.1.0
+**Fix Version error.**
+____
 ## release 1.0.0.0
 **WiddleKnight V1.0.0.0 Adds the mod menu with the option of turning the mod off, or turning it on by cloning your knights skin as the WiddleKnight, or changing the WiddleKnights skin to be different from yours. Speed has gone to 10.5. Added the default skin to the skins folder**
 ____
